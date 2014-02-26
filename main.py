@@ -2,6 +2,7 @@
 
 from utils import *
 from parse import *
+import apiclient
 
 import drive
 
@@ -9,11 +10,10 @@ import pprint
 import csv
 import uuid
 import os
+import sys
 
-OUTPUT_DIRECTORY = "output"
-OUTPUT_CSV_FILENAME = 'output/output.csv'
 SAMPLE_CATEGORY_LINKS = "samples/category_urls.txt"
-UPLOAD_FILENAME = "yellowpage-" + str(uuid.uuid4())
+OUTPUT_DIRECTORY = "output"
 
 def dict_encode_utf8(d):
     for key in d:
@@ -28,11 +28,13 @@ def get_category_links(filename):
     links = content.split()
     return links
 
-def to_csv(data):
+def to_csv(data, filename):
     order = ('uid', 'title', 'phone', 'address')
 
-    os.mkdir(OUTPUT_DIRECTORY)
-    filename = OUTPUT_CSV_FILENAME
+    try:
+        os.makedirs(OUTPUT_DIRECTORY)
+    except OSError as ose:
+        print 'mkdir: %s' % ose
 
     with open(filename, 'wb') as csvfile:
         writer = csv.DictWriter(csvfile, order)
@@ -41,19 +43,35 @@ def to_csv(data):
 
     return filename
 
-def main():
-    categoryLinks = get_category_links(SAMPLE_CATEGORY_LINKS)
+def fetch_a_category(filename):
+    CATEGORY_NAME = filename.split("/")[-1].replace(".txt", "")
+    UUID = str(uuid.uuid4()).split("-")[-1]
+    UPLOAD_FILENAME = "yellowpage-%s-%s" % (CATEGORY_NAME, UUID)
+    OUTPUT_CSV_FILENAME = '%s/output-%s-%s.csv' % (OUTPUT_DIRECTORY, CATEGORY_NAME, UUID)
+
+    categoryLinks = get_category_links(filename)
     allLinks = range_all_links(categoryLinks)
 
     allPageContent = urlfetch_all_links(allLinks)
     allItems = map(get_data, allPageContent)
     allItems = [ item for sublist in allItems for item in sublist ] #flatten
 
-    outputFile = to_csv(allItems)
-    print "output: " + outputFile
+    to_csv(allItems, OUTPUT_CSV_FILENAME)
+    print "output: " + OUTPUT_CSV_FILENAME
 
-    drive.put_csv(outputFile, UPLOAD_FILENAME)
-    
+    try:
+        drive.put_csv(OUTPUT_CSV_FILENAME, UPLOAD_FILENAME)
+    except apiclient.errors.HttpError as her:
+        print her
+
+def main():
+    if len(sys.argv) < 2:
+        print "please specify the input files."
+    else:
+        files = sys.argv[1:]
+        for fileName in files:
+            print "fetching %s..." % fileName
+            fetch_a_category(fileName)
 
 if __name__ == '__main__':
     main()

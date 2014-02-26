@@ -53,7 +53,7 @@ def get_drive_service(credential_file=CLIENT_SECRET_FILE):
 
     return build('drive', 'v2', http=http)
 
-def put_csv(file_path, title, description=None, service=None):
+def put_csv(file_path, title, description="", service=None):
     """
     Upload and convert csv file to spreadsheet on Drive
     """
